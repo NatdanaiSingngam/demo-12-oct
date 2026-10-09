@@ -1,7 +1,7 @@
 export type Status = 'todo' | 'doing' | 'done';
 export type Priority = 'low' | 'medium' | 'high';
 export type Page = 'dashboard' | 'calendar' | 'tasks' | 'projects' | 'create' | 'detail' | 'notifications';
-export interface DemoUser { id: string; name: string; email: string }
+export interface DemoUser { id: string; name: string; email: string; role?: 'student' | 'admin'; status?: 'active' | 'suspended'; createdAt?: string; lastLoginAt?: string }
 export interface Project { id: string; name: string; description: string; color: string; start: string; due: string; archived: boolean; createdAt: string }
 export interface Task { id: string; projectId: string; title: string; status: Status; priority: Priority; start: string; end: string; due: string; reminderBase: 'start' | 'due'; reminderMinutes: number; remindAt: string; reminded: boolean }
 export interface Notice { id: string; taskId: string; title: string; message: string; createdAt: string; read: boolean; simulated: boolean }
