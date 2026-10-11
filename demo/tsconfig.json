@@ -9,7 +9,8 @@
     "skipLibCheck": true,
     "noEmit": true,
     "allowImportingTsExtensions": true,
+    "types": ["node", "vite/client"],
     "tsBuildInfoFile": "./node_modules/.cache/tsconfig.tsbuildinfo"
   },
-  "include": ["src"]
+  "include": ["src", "server", "api"]
 }

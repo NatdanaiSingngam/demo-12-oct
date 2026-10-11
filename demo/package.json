@@ -7,20 +7,29 @@
     "dev": "vite --host 127.0.0.1 --port 5173 --strictPort",
     "build": "tsc -b && vite build",
     "preview": "vite preview --host 127.0.0.1 --port 4173 --strictPort",
-    "test": "playwright test"
+    "test": "playwright test",
+    "dev:api": "tsx server/dev.ts",
+    "test:api": "tsx --test server/app.test.ts"
   },
   "dependencies": {
     "@fontsource/dm-sans": "^5.3.0",
     "@fontsource/noto-sans-thai": "^5.3.0",
+    "@supabase/supabase-js": "^2.117.3",
+    "express": "^4.22.3",
     "lucide-react": "^0.468.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.51.0",
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/express": "^4.17.25",
+    "@types/node": "^24.19.2",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.3.4",
+    "tailwindcss": "^4.3.3",
+    "tsx": "^4.23.15",
     "typescript": "~5.7.2",
     "vite": "^6.1.0"
   }

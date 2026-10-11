@@ -14,6 +14,40 @@ test('create project, calendar, completion, edit, reload, and delete share one r
   await page.getByRole('button', { name: 'ลบโปรเจ็ค', exact: true }).click(); await page.getByRole('button', { name: 'ยืนยัน', exact: true }).click();
   await nav(page, 'To-do list'); await expect(page.locator('.task-row').filter({ hasText: 'งานเชื่อมทุกหน้า' })).toHaveCount(0); await nav(page, 'ปฏิทิน'); await expect(page.locator('.calendar-event').filter({ hasText: 'งานเชื่อมทุกหน้า' })).toHaveCount(0); expect(errors).toEqual([]);
 });
+test('task filters show upcoming deadlines and not-started work; projects close only when every task is done', async ({ page }) => {
+  await login(page);
+  await nav(page, 'To-do list');
+  await page.getByRole('button', { name: /ใกล้ส่ง/ }).click();
+  await expect(page.locator('.task-row').filter({ hasText: 'ออกแบบหน้าปฏิทินและ To-do list' })).toContainText('ใกล้ส่ง');
+  await expect(page.locator('.task-row').filter({ hasText: 'จัดทำต้นแบบหน้ารวมผลงาน' })).toHaveCount(0);
+  await page.getByRole('button', { name: /ยังไม่เริ่ม/ }).click();
+  await expect(page.locator('.task-row').filter({ hasText: 'เชื่อมข้อมูลระหว่างหน้าจอ' })).toHaveCount(1);
+  await expect(page.locator('.task-row').filter({ hasText: 'ออกแบบหน้าปฏิทินและ To-do list' })).toHaveCount(0);
+
+  await nav(page, 'โปรเจ็คของฉัน');
+  await page.locator('.project-card').filter({ hasText: 'Data Science Assignment' }).click();
+  const closeProject = page.getByRole('button', { name: 'ปิดโปรเจ็ค', exact: true });
+  await expect(closeProject).toBeDisabled();
+  const unfinishedTasks = page.locator('.task-row:not(.completed) .task-check');
+  while (await unfinishedTasks.count()) await unfinishedTasks.first().click();
+  await expect(closeProject).toBeEnabled();
+  await closeProject.click();
+  await expect(page.getByRole('dialog')).toContainText('งานทุกชิ้นเสร็จแล้ว');
+  await page.getByRole('button', { name: 'ยืนยัน', exact: true }).click();
+  await expect(page.locator('.form-warning')).toContainText('โปรเจ็คอยู่ในคลัง');
+  await expect(page.locator('.task-row .task-check').first()).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'แก้ไขโปรเจ็ค', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'โปรเจ็คทั้งหมด' }).click();
+  await page.locator('.projects-toolbar').getByRole('button', { name: /เก็บเข้าคลัง/ }).click();
+  const closedCard = page.locator('.project-card').filter({ hasText: 'Data Science Assignment' });
+  await expect(closedCard).toContainText('ปิดแล้ว');
+  await closedCard.click();
+  const restoreProject = page.getByRole('button', { name: 'นำโปรเจ็คกลับมา', exact: true });
+  await expect(restoreProject).toBeEnabled();
+  await restoreProject.click();
+  await page.getByRole('button', { name: 'ยืนยัน', exact: true }).click();
+  await expect(page.getByText('นำโปรเจ็คกลับมาแล้ว')).toBeVisible();
+});
 test('scheduled reminder fires once, clicking opens task, and completed tasks cancel pending reminders', async ({ page }) => {
   await login(page); await nav(page, 'To-do list'); await page.getByRole('button', { name: 'เพิ่มงาน', exact: true }).click(); const dialog = page.getByRole('dialog');
   await dialog.getByLabel('ชื่องาน', { exact: true }).fill('เตือนจริงทดสอบ'); await dialog.getByLabel('กำหนดส่ง', { exact: true }).fill('2026-10-07T09:01'); await dialog.getByLabel('ช่วงเวลาเตือน').selectOption('0'); await dialog.getByRole('button', { name: 'บันทึกงาน', exact: true }).click();
@@ -35,7 +69,7 @@ test('registration stores no password, users are isolated, mock login restores o
   await page.getByRole('button', { name: 'ออกจากระบบ', exact: true }).click(); await page.getByRole('button', { name: 'ลองใช้งานเดโม', exact: true }).click(); await expect(page.locator('.project-card')).toHaveCount(3);
 });
 test('archive hides tasks and restoring brings calendar records back', async ({ page }) => {
-  await login(page); await nav(page, 'โปรเจ็คของฉัน'); await page.locator('.project-card').filter({ hasText: 'ProjectRecord · SE Project' }).click(); await page.getByRole('button', { name: 'เก็บโปรเจ็คเข้าคลัง', exact: true }).click(); await page.getByRole('button', { name: 'ยืนยัน', exact: true }).click(); await nav(page, 'To-do list'); await expect(page.locator('.task-row').filter({ hasText: 'ออกแบบหน้าปฏิทินและ To-do list' })).toHaveCount(0); await nav(page, 'โปรเจ็คของฉัน'); await page.getByRole('button', { name: /เก็บเข้าคลัง/ }).click(); await page.locator('.project-card').filter({ hasText: 'ProjectRecord · SE Project' }).click(); await page.getByRole('button', { name: 'นำโปรเจ็คกลับมา', exact: true }).click(); await page.getByRole('button', { name: 'ยืนยัน', exact: true }).click(); await nav(page, 'To-do list'); await expect(page.locator('.task-row').filter({ hasText: 'ออกแบบหน้าปฏิทินและ To-do list' })).toHaveCount(1);
+  await login(page); await nav(page, 'โปรเจ็คของฉัน'); await page.locator('.project-card').filter({ hasText: 'ProjectRecord · SE Project' }).click(); await expect(page.getByRole('button', { name: 'ปิดโปรเจ็ค', exact: true })).toBeDisabled(); const unfinishedTasks = page.locator('.task-row:not(.completed) .task-check'); while (await unfinishedTasks.count()) await unfinishedTasks.first().click(); await page.getByRole('button', { name: 'ปิดโปรเจ็ค', exact: true }).click(); await page.getByRole('button', { name: 'ยืนยัน', exact: true }).click(); await nav(page, 'To-do list'); await expect(page.locator('.task-row').filter({ hasText: 'ออกแบบหน้าปฏิทินและ To-do list' })).toHaveCount(0); await nav(page, 'โปรเจ็คของฉัน'); await page.getByRole('button', { name: /เก็บเข้าคลัง/ }).click(); await page.locator('.project-card').filter({ hasText: 'ProjectRecord · SE Project' }).click(); await page.getByRole('button', { name: 'นำโปรเจ็คกลับมา', exact: true }).click(); await page.getByRole('button', { name: 'ยืนยัน', exact: true }).click(); await nav(page, 'To-do list'); await expect(page.locator('.task-row').filter({ hasText: 'ออกแบบหน้าปฏิทินและ To-do list' })).toHaveCount(1);
 });
 test('mobile navigation, forms, and calendar stay within the viewport', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 }); await page.goto('/'); await expect(page.getByRole('button', { name: 'ลองใช้งานเดโม', exact: true })).toBeVisible(); expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true); await page.getByRole('button', { name: 'ลองใช้งานเดโม', exact: true }).click(); await page.getByRole('button', { name: 'เปิดเมนู', exact: true }).click(); await nav(page, 'ปฏิทิน'); await expect(page.locator('.day-detail')).toBeVisible(); expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true); await page.getByRole('button', { name: 'เปิดเมนู', exact: true }).click(); await nav(page, 'โปรเจ็คของฉัน'); await page.getByRole('button', { name: 'สร้างโปรเจ็ค', exact: true }).click(); await expect(page.getByLabel('ชื่อโปรเจ็ค')).toBeVisible(); expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);

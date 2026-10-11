@@ -24,6 +24,7 @@ export function inputTime(iso: string) {
 }
 export const toISO = (value: string) => value ? new Date(`${value}:00+07:00`).toISOString() : '';
 export const datePart = (iso: string) => iso ? inputTime(iso).slice(0, 10) : '';
+export const dueSoon = (task: Task) => task.status !== 'done' && !!task.due && !overdue(task) && datePart(task.due) <= shiftDate(today(), 7);
 export function dateLabel(value: string, full = false) {
   if (!value) return 'ยังไม่กำหนด';
   return new Intl.DateTimeFormat('th-TH', { timeZone: 'Asia/Bangkok', day: 'numeric', month: full ? 'long' : 'short', ...(full ? { year: 'numeric' } : {}) }).format(new Date(value.length === 10 ? `${value}T12:00:00+07:00` : value));

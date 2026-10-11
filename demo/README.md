@@ -12,6 +12,46 @@ npm.cmd run dev
 
 เปิด http://127.0.0.1:5173 แล้วเลือก **ลองใช้งานเดโม**
 
+## เชื่อมต่อ Supabase (บัญชีจริงและการแยกสิทธิ์)
+
+เดโมมี 2 โหมด เลือกอัตโนมัติจาก environment variables
+
+| โหมด | เงื่อนไข | บัญชีและสิทธิ์ |
+| --- | --- | --- |
+| Local (ค่าเริ่มต้น) | ไม่ตั้ง `VITE_SUPABASE_*` | บัญชีจำลองใน `localStorage` ตามรายละเอียดด้านล่าง |
+| Supabase | ตั้ง `VITE_SUPABASE_URL` และ `VITE_SUPABASE_ANON_KEY` | Supabase Auth + Row Level Security แยกสิทธิ์ที่ฐานข้อมูล |
+
+ขั้นตอนตั้งค่า
+
+1. สร้างโปรเจ็คที่ https://supabase.com แล้วเปิด **SQL Editor** รันไฟล์ `supabase/schema.sql` ทั้งไฟล์
+2. คัดลอก `.env.example` เป็น `.env.local` แล้วใส่ **Project URL** และ **anon public key** จาก Project Settings > API (ห้ามใช้ `service_role` key ใน frontend)
+3. `npm.cmd run dev` แล้วสมัครสมาชิกผ่านหน้าเว็บ (ถ้าเปิด Confirm email ไว้ ต้องกดลิงก์ในอีเมลก่อนเข้าสู่ระบบ)
+4. ตั้งแอดมินคนแรกใน SQL Editor: `update public.profiles set role = 'admin' where email = 'อีเมลของคุณ';` แล้วออกจากระบบและเข้าใหม่
+
+การแยกสิทธิ์ (บังคับที่ฐานข้อมูลและเซิร์ฟเวอร์ ไม่ได้พึ่งหน้าเว็บ)
+
+- `profiles` — ทุกคนอ่านได้เฉพาะ profile ตนเอง ไม่มีผู้ใช้คนใดแก้ `role`/`status` ได้ ผู้สมัครใหม่เป็น `student` เสมอ (trigger `handle_new_user`)
+- `user_data` — โปรเจ็ค/งาน/การแจ้งเตือน เจ้าของที่ active อ่านและเขียนได้เฉพาะแถวของตนเอง บัญชีที่ถูกระงับอ่าน/เขียนไม่ได้ แอดมินก็เปิดดูข้อมูลคนอื่นผ่านเบราว์เซอร์โดยตรงไม่ได้
+- `admin_audit` — ไม่มี policy ให้ผู้ใช้เบราว์เซอร์ อ่านและเขียนได้เฉพาะ service_role ผ่าน API
+- **Express API** ([server/app.ts](server/app.ts)) — งานแอดมินทั้งหมดอยู่ที่นี่ ทุก request ต้องแนบ access token ของ Supabase เซิร์ฟเวอร์ตรวจ token แล้วเช็กจากฐานข้อมูลอีกครั้งว่าผู้เรียกเป็นแอดมินที่ active ก่อนใช้ `service_role` key
+  - `GET /api/admin/snapshot` — บัญชี ข้อมูลโปรเจ็ค และประวัติทั้งหมด
+  - `POST /api/admin/accounts/:id/:action` — `suspend` `restore` `admin` `student` `delete` พร้อม `{ "reason": "..." }` ห้ามจัดการบัญชีตนเอง บังคับเหตุผล 2–500 ตัวอักษร และบันทึกประวัติทุกครั้ง การลบใช้ `auth.admin.deleteUser` ซึ่งลบ profile และข้อมูลต่อเนื่อง
+  - `GET /api/health`
+- หน้าเว็บตรวจสถานะบัญชีทุก 30 วินาที บัญชีที่ถูกระงับหรือลบจะถูกออกจากระบบ และเมื่อบทบาทเปลี่ยนจะสลับหน้าจอทันที
+
+ใน Supabase mode ปุ่ม “ลองใช้งานเดโม” และ “ลองใช้ฝั่งแอดมิน” จะถูกซ่อน เพราะไม่มีบัญชีตัวอย่างแบบไม่ต้องใส่รหัสผ่าน
+
+รันในเครื่อง (ต้องเปิด 2 terminal): ใส่ `SUPABASE_SERVICE_ROLE_KEY` ใน `.env.local` แล้วรัน `npm.cmd run dev:api` (API พอร์ต 3001) และ `npm.cmd run dev` (Vite proxy `/api` ไปที่ API) ถ้าไม่เปิด API ผู้ใช้ทั่วไปยังใช้งานได้ปกติ แต่หน้าแอดมินจะโหลดข้อมูลไม่ได้
+
+## Deploy บน Vercel (Frontend + API)
+
+1. Import repository ที่ Vercel แล้วตั้ง **Root Directory = `demo`** (`vercel.json` สั่ง build แบบ Vite และส่งทุก `/api/*` ไปที่ `api/index.ts` ซึ่งเรียก Express ตัวเดียวกับตอน dev)
+2. ตั้ง Environment Variables: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` และ `SUPABASE_SERVICE_ROLE_KEY` (ตัวสุดท้ายห้ามมี `VITE_` นำหน้า และตั้งเป็น Sensitive)
+3. เพิ่ม URL ของ Vercel ใน Supabase > Authentication > URL Configuration
+4. ทุก push ได้ Preview URL แยกต่อ branch ส่วน `main` ขึ้น Production
+
+หมายเหตุ: GitHub Pages เป็น static hosting ไม่มี API ถ้า deploy Supabase mode ที่นั่น หน้าแอดมินจะใช้ไม่ได้ ให้ใช้ Vercel แทน หรือ deploy Pages เฉพาะโหมดเดโม (ไม่ตั้งตัวแปร `VITE_SUPABASE_*`)
+
 ## GitHub Pages
 
 Repository สำหรับเดโม: https://github.com/NatdanaiSingngam/demo-12-oct
@@ -42,9 +82,10 @@ URL สำหรับเผยแพร่: https://natdanaisingngam.github.io/
 
 - หน้าหลัก สมัครสมาชิก และเข้าสู่ระบบแบบจำลอง
 - Dashboard ที่คำนวณจากข้อมูลจริงในเดโม
-- สร้าง/แก้ไข/ลบ/เก็บเข้าคลังโปรเจ็ค พร้อมเพิ่มงานย่อยหลายรายการ
+- สร้าง/แก้ไข/ลบโปรเจ็ค พร้อมปิดโปรเจ็คเข้าคลังได้เมื่องานย่อยทุกงานเสร็จแล้ว โปรเจ็คที่ปิดจะแก้ไขไม่ได้จนกว่าจะนำกลับมาเปิด
 - งานมีสถานะ ความสำคัญ ช่วงเวลาทำงาน กำหนดส่ง และเวลาเตือน
-- To-do list พร้อมค้นหา กรองตามโปรเจ็ค วันนี้ งานเลยกำหนด และสถานะ
+- To-do list พร้อมค้นหา กรองตามโปรเจ็ค วันนี้ ใกล้ส่ง (ภายใน 7 วัน) งานเลยกำหนด และสถานะ
+- ภาพรวมโปรเจ็คแสดงจำนวนงานที่กำลังทำ ยังไม่เริ่ม และเสร็จแล้ว พร้อมความคืบหน้า
 - ปฏิทินเดือน/สัปดาห์ เลื่อนช่วงเวลา คลิกวันที่ ดูแผน เพิ่ม/แก้ไขงาน
 - ทุกหน้าใช้ข้อมูลเดียวกัน และข้อมูลไม่หายเมื่อรีเฟรช
 - การแจ้งเตือนในแอป มีอ่านแล้ว/ยังไม่อ่าน เปิดกลับไปยังงาน เลื่อนอีก 10 นาที และการจำลองเวลา
@@ -70,7 +111,8 @@ URL สำหรับเผยแพร่: https://natdanaisingngam.github.io/
 ```powershell
 npm.cmd run build
 npm.cmd run preview
-npm.cmd test
+npm.cmd test          # Playwright (หน้าเว็บ โหมด localStorage)
+npm.cmd run test:api  # ทดสอบ Express API ด้วยฐานข้อมูลจำลองในหน่วยความจำ ไม่ต้องมี Supabase
 ```
 
 `build` ตรวจ TypeScript และสร้างไฟล์ใน `demo/dist/` `preview` เปิดที่ http://127.0.0.1:4173
@@ -92,11 +134,21 @@ npm.cmd test
 
 `src/model.ts` — ข้อมูล วันที่ ความคืบหน้า และการเตือน
 
-`src/accounts.ts` — บัญชีจำลอง บทบาท สถานะ และประวัติการจัดการ
+`src/accounts.ts` — บัญชีจำลอง บทบาท สถานะ และประวัติการจัดการ (โหมด Local)
 
-`src/AdminApp.tsx`, `src/admin.css` — หน้าจอฝั่งแอดมิน
+`src/cloud.ts` — Supabase client, Auth, บันทึก/อ่านข้อมูล และ RPC ของแอดมิน (โหมด Supabase)
 
-`src/style.css` — รูปแบบหน้าจอและ responsive
+`supabase/schema.sql` — ตาราง, RLS policies และ trigger สำหรับแยกสิทธิ์
+
+`server/app.ts` — Express API สำหรับงานแอดมิน (`server/dev.ts` รันในเครื่อง, `api/index.ts` เป็นทางเข้า Vercel Function)
+
+`src/AdminApp.tsx` — หน้าจอฝั่งแอดมิน
+
+`src/index.css` — Tailwind CSS v4: design tokens (`@theme` สี ฟอนต์ ขนาดตัวอักษร breakpoint) และค่าเริ่มต้นของ element ใน `@layer base`
+
+`src/ui.ts` — ชุด class ของ Tailwind ที่ใช้ซ้ำ (ปุ่ม badge panel modal sidebar) แยกขนาด/สีเป็นพารามิเตอร์เพื่อไม่ให้ utility ชนกัน
+
+หน้าจอทั้งหมดจัดรูปแบบด้วย Tailwind utility class ใน JSX โดยตรง Breakpoint ใช้แบบ `max-*` ตามดีไซน์เดิม: `max-xs` ≤430px, `max-sm` ≤760px, `max-md` ≤1000px, `max-lg` ≤1200px และ `xl` ≥1550px class อย่าง `task-row`, `side-nav`, `stats-grid` ที่ไม่มี style เก็บไว้เป็นตัวระบุสำหรับชุดทดสอบ
 
 `tests/demo.spec.ts` — ทดสอบเส้นทางใช้งานครบวงจร
 
