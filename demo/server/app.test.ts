@@ -49,7 +49,7 @@ describe('admin API', () => {
   after(() => { server.close(); });
   beforeEach(() => {
     fake.failures.clear(); fake.tokens.clear();
-    fake.tables.profiles = [profile(ADMIN, 'admin', 'admin'), profile(STUDENT, 'student', 'student'), profile(OTHER, 'other', 'student')];
+    fake.tables.profiles = [profile(ADMIN, 'admin', 'admin'), profile(STUDENT, 'student', 'user'), profile(OTHER, 'other', 'user')];
     fake.tables.user_data = [{ user_id: STUDENT, data: { projects: [], tasks: [], notices: [] } }];
     fake.tables.admin_audit = [];
     fake.tokens.set('admin-token', ADMIN); fake.tokens.set('student-token', STUDENT);
@@ -90,15 +90,15 @@ describe('admin API', () => {
   describe('account actions', () => {
     it('suspends and restores an account and records both in the audit log', async () => {
       assert.equal((await manage(STUDENT, 'suspend', 'ละเมิดกฎ')).status, 200);
-      assert.equal(find(STUDENT)!.status, 'suspended');
+      assert.equal(find(STUDENT)!.status, 'suspended'); assert.equal(find(STUDENT)!.status_reason, 'ละเมิดกฎ'); assert.ok(find(STUDENT)!.status_changed_at);
       assert.equal((await manage(STUDENT, 'restore', 'อุทธรณ์ผ่าน')).status, 200);
-      assert.equal(find(STUDENT)!.status, 'active');
+      assert.equal(find(STUDENT)!.status, 'active'); assert.equal(find(STUDENT)!.status_reason, null);
       assert.deepEqual(fake.tables.admin_audit.map(r => r.action), ['ระงับบัญชี', 'เปิดใช้งานบัญชี']);
       assert.equal(fake.tables.admin_audit[0].actor_id, ADMIN); assert.equal(fake.tables.admin_audit[0].reason, 'ละเมิดกฎ');
     });
     it('changes roles', async () => {
       await manage(STUDENT, 'admin'); assert.equal(find(STUDENT)!.role, 'admin');
-      await manage(STUDENT, 'student'); assert.equal(find(STUDENT)!.role, 'student');
+      await manage(STUDENT, 'user'); assert.equal(find(STUDENT)!.role, 'user');
     });
     it('deletes the account and its data but keeps the audit entry', async () => {
       assert.equal((await manage(STUDENT, 'delete')).status, 200);
@@ -106,7 +106,7 @@ describe('admin API', () => {
       assert.equal(fake.tables.admin_audit.length, 1); assert.equal(fake.tables.admin_audit[0].target_email, 'student@example.com');
     });
     it('refuses to act on the caller’s own account', async () => {
-      for (const action of ['suspend', 'delete', 'student']) assert.equal((await manage(ADMIN, action)).status, 403);
+      for (const action of ['suspend', 'delete', 'user']) assert.equal((await manage(ADMIN, action)).status, 403);
       assert.equal(find(ADMIN)!.role, 'admin'); assert.equal(fake.tables.admin_audit.length, 0);
     });
     it('validates the reason (2–500 characters after trimming)', async () => {

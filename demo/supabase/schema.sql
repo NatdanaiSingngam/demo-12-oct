@@ -7,11 +7,22 @@ create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   name text not null default '' check (char_length(name) <= 80),
   email text not null,
-  role text not null default 'student' check (role in ('student', 'admin')),
+  role text not null default 'user' check (role in ('user', 'admin')),
   status text not null default 'active' check (status in ('active', 'suspended')),
   created_at timestamptz not null default now(),
-  last_login_at timestamptz
+  last_login_at timestamptz,
+  status_reason text check (status_reason is null or char_length(status_reason) <= 500),
+  status_changed_at timestamptz
 );
+-- สำหรับฐานข้อมูลที่สร้างตารางไว้ก่อนแล้ว: เก็บเหตุผลที่ระงับ เพื่อแสดงให้ผู้ใช้เห็นเมื่อเข้าสู่ระบบ
+alter table public.profiles add column if not exists status_reason text check (status_reason is null or char_length(status_reason) <= 500);
+alter table public.profiles add column if not exists status_changed_at timestamptz;
+
+-- บทบาทเหลือสองแบบ: user (ผู้ใช้งาน) กับ admin สำหรับฐานข้อมูลเดิมที่ใช้ค่า 'student'
+alter table public.profiles drop constraint if exists profiles_role_check;
+update public.profiles set role = 'user' where role = 'student';
+alter table public.profiles add constraint profiles_role_check check (role in ('user', 'admin'));
+alter table public.profiles alter column role set default 'user';
 
 -- เก็บโปรเจ็ค งาน และการแจ้งเตือนของแต่ละบัญชีเป็น JSON ก้อนเดียว (โครงสร้างเดียวกับ Data ใน src/model.ts)
 create table if not exists public.user_data (
@@ -39,7 +50,7 @@ language sql stable security definer set search_path = public as $$
   select exists (select 1 from public.profiles where id = auth.uid() and status = 'active');
 $$;
 
--- สร้าง profile และพื้นที่ข้อมูลว่างทุกครั้งที่มีผู้สมัครใหม่ บทบาทเริ่มต้นเป็นนักศึกษาเสมอ
+-- สร้าง profile และพื้นที่ข้อมูลว่างทุกครั้งที่มีผู้สมัครใหม่ บทบาทเริ่มต้นเป็นผู้ใช้งานเสมอ
 create or replace function public.handle_new_user() returns trigger
 language plpgsql security definer set search_path = public as $$
 begin
@@ -107,6 +118,32 @@ drop function if exists public.is_admin();
 revoke execute on function public.record_login() from public, anon;
 grant execute on function public.record_login() to authenticated;
 grant execute on function public.is_active_user() to authenticated;
+
+-- แก้ชื่อของตัวเอง: ผู้ใช้อัปเดต profiles ตรง ๆ ไม่ได้ (ไม่มี policy update) จึงให้แก้ได้เฉพาะช่องชื่อผ่านฟังก์ชันนี้
+create or replace function public.update_my_name(p_name text) returns public.profiles
+language plpgsql security definer set search_path = public as $$
+declare result public.profiles; clean text := left(trim(coalesce(p_name, '')), 80);
+begin
+  if char_length(clean) < 1 then raise exception 'กรุณากรอกชื่อ'; end if;
+  update public.profiles set name = clean where id = auth.uid() and status = 'active' returning * into result;
+  if result.id is null then raise exception 'ไม่พบบัญชี หรือบัญชีถูกระงับ'; end if;
+  return result;
+end;
+$$;
+revoke execute on function public.update_my_name(text) from public, anon;
+grant execute on function public.update_my_name(text) to authenticated;
+
+-- เมื่อเปลี่ยนอีเมลใน Supabase Auth ให้คัดลอกมาที่ profiles ด้วย
+create or replace function public.sync_profile_email() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  update public.profiles set email = lower(new.email) where id = new.id;
+  return new;
+end;
+$$;
+drop trigger if exists on_auth_user_email_changed on auth.users;
+create trigger on_auth_user_email_changed after update of email on auth.users
+  for each row when (old.email is distinct from new.email) execute function public.sync_profile_email();
 
 -- ---------- ตั้งแอดมินคนแรก ----------
 -- สมัครบัญชีผ่านหน้าเว็บก่อน แล้วรันคำสั่งนี้ใน SQL Editor โดยเปลี่ยนอีเมล:

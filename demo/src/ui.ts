@@ -60,7 +60,7 @@ const BADGE: Record<string, string> = {
 };
 export const badge = (kind = '', extra = '') => cx('inline-flex items-center gap-1 whitespace-nowrap rounded-[5px] px-2 py-0.75 text-11 font-normal leading-[1.6]', BADGE[kind] || 'text-[#6c6f65] bg-[#f4f5f0]', extra);
 
-// Stat tiles shared by the student dashboard and the admin overview.
+// Stat tiles shared by the user dashboard and the admin overview.
 export const statCard = 'rounded-[11px] border border-line bg-white px-5 py-4.5 max-lg:p-4 max-sm:p-4.25 max-xs:px-3.25 max-xs:py-3.75';
 export const statLabel = 'flex items-center justify-between gap-2.5 text-13 text-[#687061] max-lg:text-12 max-md:text-14 max-sm:text-13 max-xs:gap-1.25 max-xs:text-12';
 export const statIcon = (warning = false) => cx('flex size-7.75 items-center justify-center rounded-lg max-xs:size-6.25 [&_svg]:w-4 [&_svg]:stroke-[1.8]', warning ? 'bg-[#fcf4e9] text-[#806b51]' : 'bg-[#f5f7ee] text-[#677258]');
@@ -68,7 +68,7 @@ export const statValue = (warning = false) => cx('mt-1.75 block text-[2.03rem] f
 export const statNote = 'text-11 text-[#6a7063] max-lg:text-[.66rem] max-md:text-12 max-sm:text-[.72rem] max-xs:text-[.68rem]';
 export const statsGrid = (columns = 'grid-cols-4 max-md:grid-cols-2') => cx('stats-grid mb-6.25 grid gap-4 xl:gap-5.5 max-lg:gap-3 max-xs:gap-2.5', columns);
 
-// Workspace shell shared by the student and admin areas.
+// Workspace shell shared by the user and admin areas.
 export const sidebar = (open: boolean) => cx('sidebar fixed inset-y-0 left-0 z-30 flex w-[246px] flex-col overflow-y-auto border-r border-line bg-white px-5 pt-7.25 max-lg:w-[220px] max-lg:px-3.75 max-lg:pt-6.5 max-sm:w-[260px] max-sm:transition-transform max-sm:duration-200', !open && 'max-sm:-translate-x-full');
 export const sidebarBrand = 'px-1.75 pb-6.25 max-sm:flex max-sm:items-center max-sm:justify-between';
 export const workspaceLabel = 'mb-7.75 flex items-center gap-2.5 rounded-[10px] border border-[#ebeee4] bg-[#f7f8f2] p-2.75 [&_strong]:text-13 [&_strong]:font-medium [&_small]:block [&_small]:text-11 [&_small]:text-[#6a7064]';

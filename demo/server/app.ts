@@ -3,12 +3,12 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 // Admin API. The browser never holds the service_role key: it sends its Supabase access token,
 // this server verifies it and re-checks that the caller is an active admin before doing anything.
-const ACTIONS = { suspend: 'ระงับบัญชี', restore: 'เปิดใช้งานบัญชี', delete: 'ลบบัญชี', admin: 'เปลี่ยนบทบาทเป็นแอดมิน', student: 'เปลี่ยนบทบาทเป็นนักศึกษา' } as const;
+const ACTIONS = { suspend: 'ระงับบัญชี', restore: 'เปิดใช้งานบัญชี', delete: 'ลบบัญชี', admin: 'เปลี่ยนบทบาทเป็นแอดมิน', user: 'เปลี่ยนบทบาทเป็นผู้ใช้งาน' } as const;
 type Action = keyof typeof ACTIONS;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 class HttpError extends Error { constructor(public status: number, message: string) { super(message); } }
-interface Profile { id: string; name: string; email: string; role: 'student' | 'admin'; status: 'active' | 'suspended' }
+interface Profile { id: string; name: string; email: string; role: 'user' | 'admin'; status: 'active' | 'suspended' }
 
 let cached: SupabaseClient | null = null;
 function service(): SupabaseClient {
@@ -70,9 +70,9 @@ app.post('/api/admin/accounts/:id/:action', requireAdmin(db), wrap(async (req, r
   if (!target) throw new HttpError(404, 'ไม่พบบัญชีนี้ อาจถูกลบไปแล้ว');
 
   if (action === 'suspend' || action === 'restore') {
-    const { error } = await sb.from('profiles').update({ status: action === 'suspend' ? 'suspended' : 'active' }).eq('id', id);
+    const { error } = await sb.from('profiles').update({ status: action === 'suspend' ? 'suspended' : 'active', status_reason: action === 'suspend' ? reason : null, status_changed_at: new Date().toISOString() }).eq('id', id);
     if (error) throw new HttpError(500, 'บันทึกไม่ได้');
-  } else if (action === 'admin' || action === 'student') {
+  } else if (action === 'admin' || action === 'user') {
     const { error } = await sb.from('profiles').update({ role: action }).eq('id', id);
     if (error) throw new HttpError(500, 'บันทึกไม่ได้');
   } else {

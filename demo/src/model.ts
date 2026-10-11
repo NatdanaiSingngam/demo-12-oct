@@ -1,11 +1,15 @@
 export type Status = 'todo' | 'doing' | 'done';
 export type Priority = 'low' | 'medium' | 'high';
-export type Page = 'dashboard' | 'calendar' | 'tasks' | 'projects' | 'create' | 'detail' | 'notifications';
-export interface DemoUser { id: string; name: string; email: string; role?: 'student' | 'admin'; status?: 'active' | 'suspended'; createdAt?: string; lastLoginAt?: string }
+export type Page = 'dashboard' | 'calendar' | 'tasks' | 'projects' | 'create' | 'detail' | 'notifications' | 'profile';
+export interface DemoUser { id: string; name: string; email: string; role?: 'user' | 'admin'; status?: 'active' | 'suspended'; createdAt?: string; lastLoginAt?: string; statusReason?: string; statusChangedAt?: string }
 export interface Project { id: string; name: string; description: string; color: string; start: string; due: string; archived: boolean; createdAt: string }
 export interface Task { id: string; projectId: string; title: string; status: Status; priority: Priority; start: string; end: string; due: string; reminderBase: 'start' | 'due'; reminderMinutes: number; remindAt: string; reminded: boolean }
 export interface Notice { id: string; taskId: string; title: string; message: string; createdAt: string; read: boolean; simulated: boolean }
 export interface Data { projects: Project[]; tasks: Task[]; notices: Notice[] }
+/** Why an account cannot be used; shown to the person it concerns (login screen or after being signed out). */
+export interface Blocked { kind: 'suspended' | 'removed'; reason?: string; at?: string }
+export class AccountBlockedError extends Error { constructor(public blocked: Blocked, message: string) { super(message); this.name = 'AccountBlockedError'; } }
+export const ROLE_LABEL = { user: 'ผู้ใช้งาน', admin: 'แอดมิน' } as const;
 export const COLORS = ['#41765c', '#7386bd', '#ce9b48', '#bd7a78', '#8b74ac', '#519d9f'];
 export const STATUS_LABEL: Record<Status, string> = { todo: 'ยังไม่เริ่ม', doing: 'กำลังทำ', done: 'เสร็จแล้ว' };
 export const PRIORITY_LABEL: Record<Priority, string> = { low: 'ต่ำ', medium: 'ปานกลาง', high: 'สูง' };

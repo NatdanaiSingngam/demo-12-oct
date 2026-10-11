@@ -20,7 +20,7 @@ test('suspend, filtered audit trail, refused login, and restoration work togethe
   await register(page); await page.getByRole('button', { name: 'ออกจากระบบ', exact: true }).click(); await admin(page); await nav(page, 'จัดการผู้ใช้');
   await page.getByLabel('ค้นหาผู้ใช้').fill('admin-test@example.com'); await expect(page.locator('tbody tr')).toHaveCount(1); await page.getByRole('button', { name: 'ระงับ admin-test@example.com', exact: true }).click(); await page.getByLabel('เหตุผล').fill('ตรวจสอบบัญชีสำหรับเดโม'); await page.getByRole('button', { name: 'ยืนยันระงับบัญชี', exact: true }).click(); await expect(page.locator('tbody')).toContainText('ถูกระงับ');
   await page.getByLabel('กรองสถานะบัญชี').selectOption('active'); await expect(page.locator('tbody tr')).toHaveCount(0); await nav(page, 'ประวัติการจัดการ'); await page.getByLabel('ค้นหาประวัติ').fill('admin-test@example.com'); await expect(page.locator('.admin-history-item')).toContainText('ตรวจสอบบัญชีสำหรับเดโม'); await expect(page.locator('.admin-history-item')).toContainText('ภัทรพล');
-  await page.getByRole('button', { name: 'ออกจากระบบ', exact: true }).click(); await page.getByRole('button', { name: 'เข้าสู่ระบบ', exact: true }).click(); await page.getByLabel('อีเมล', { exact: true }).fill('admin-test@example.com'); await page.getByLabel('รหัสผ่านจำลอง', { exact: true }).fill('fake123'); await page.getByRole('button', { name: 'เข้าสู่ระบบ', exact: true }).click(); await expect(page.getByRole('alert')).toContainText('ถูกระงับ');
+  await page.getByRole('button', { name: 'ออกจากระบบ', exact: true }).click(); await page.getByRole('button', { name: 'เข้าสู่ระบบ', exact: true }).click(); await page.getByLabel('อีเมล', { exact: true }).fill('admin-test@example.com'); await page.getByLabel('รหัสผ่านจำลอง', { exact: true }).fill('fake123'); await page.getByRole('button', { name: 'เข้าสู่ระบบ', exact: true }).click(); await expect(page.getByRole('alert')).toContainText('ถูกระงับ'); await expect(page.getByRole('alert')).toContainText('ตรวจสอบบัญชีสำหรับเดโม'); await expect(page.getByRole('alert')).toContainText('เหตุผลจากผู้ดูแลระบบ');
   await page.getByLabel('อีเมล', { exact: true }).fill('admin@projectrecord.local'); await page.getByRole('button', { name: 'เข้าสู่ระบบ', exact: true }).click(); await nav(page, 'จัดการผู้ใช้'); await page.getByRole('button', { name: 'เปิดใช้งาน admin-test@example.com', exact: true }).click(); await page.getByLabel('เหตุผล').fill('ตรวจสอบเสร็จแล้ว'); await page.getByRole('button', { name: 'ยืนยันเปิดใช้งานบัญชี', exact: true }).click(); await expect(page.locator('tbody tr').filter({ hasText: 'admin-test@example.com' })).toContainText('พร้อมใช้งาน');
 });
 test('deleting a registered user requires email confirmation and preserves audit but removes owned data', async ({ page }) => {
@@ -35,4 +35,33 @@ test('registration cannot claim admin role through session JSON; authorized prom
 });
 test('admin mobile menu and horizontal user table do not overflow the page', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 }); await page.goto('/'); await page.getByRole('button', { name: 'ลองใช้ฝั่งแอดมิน', exact: true }).click(); await expect(page.getByRole('heading', { name: 'ภาพรวมระบบ', exact: true })).toBeVisible(); expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true); await page.getByRole('button', { name: 'เปิดเมนู', exact: true }).click(); await nav(page, 'จัดการผู้ใช้'); await expect(page.locator('.admin-table')).toBeVisible(); expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+test('users can edit name and email from the profile; roles are only ผู้ใช้งาน and แอดมิน', async ({ page }) => {
+  const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
+  await register(page, 'profile-test@example.com');
+  await page.getByRole('button', { name: 'โปรไฟล์ของฉัน', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'โปรไฟล์', exact: true })).toBeVisible();
+  await expect(page.getByText('ผู้ใช้งาน', { exact: true }).first()).toBeVisible(); await expect(page.getByText('นักศึกษา', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('โหมดเดโมไม่มีรหัสผ่านจริง')).toBeVisible();
+  await page.getByLabel('ชื่อ', { exact: false }).first().fill('ชื่อใหม่ทดสอบ'); await page.getByLabel('อีเมล', { exact: false }).fill('profile-new@example.com'); await page.getByRole('button', { name: 'บันทึกข้อมูล' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'บันทึกข้อมูลแล้ว' })).toBeVisible(); await expect(page.locator('.sidebar')).toContainText('ชื่อใหม่ทดสอบ');
+  await page.reload(); await expect(page.locator('.sidebar')).toContainText('ชื่อใหม่ทดสอบ');
+  // The new e-mail logs in; the old one no longer exists.
+  await page.getByRole('button', { name: 'ออกจากระบบ', exact: true }).click(); await page.getByRole('button', { name: 'เข้าสู่ระบบ', exact: true }).click();
+  await page.getByLabel('อีเมล', { exact: true }).fill('profile-test@example.com'); await page.getByLabel('รหัสผ่านจำลอง', { exact: true }).fill('fake123'); await page.getByRole('button', { name: 'เข้าสู่ระบบ', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('ไม่พบบัญชี');
+  await page.getByLabel('อีเมล', { exact: true }).fill('profile-new@example.com'); await page.getByRole('button', { name: 'เข้าสู่ระบบ', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'สวัสดี, ชื่อใหม่ทดสอบ' })).toBeVisible(); expect(errors).toEqual([]);
+});
+test('profile rejects a taken e-mail, locks the built-in demo e-mail, and works for admins too', async ({ page }) => {
+  await register(page, 'profile-dup@example.com');
+  await page.getByRole('button', { name: 'โปรไฟล์ของฉัน', exact: true }).click();
+  await page.getByLabel('อีเมล', { exact: false }).fill('demo@projectrecord.local'); await page.getByRole('button', { name: 'บันทึกข้อมูล' }).click();
+  await expect(page.getByRole('alert')).toContainText('มีบัญชีอยู่แล้ว');
+  await page.getByRole('button', { name: 'ออกจากระบบ', exact: true }).click(); await admin(page);
+  await page.getByRole('button', { name: 'โปรไฟล์ของฉัน', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'โปรไฟล์', exact: true })).toBeVisible(); await expect(page.getByLabel('อีเมล', { exact: false })).toBeDisabled();
+  await page.getByLabel('ชื่อ', { exact: false }).first().fill('แอดมินเปลี่ยนชื่อ'); await page.getByRole('button', { name: 'บันทึกข้อมูล' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'บันทึกข้อมูลแล้ว' })).toBeVisible(); await expect(page.locator('.sidebar')).toContainText('แอดมินเปลี่ยนชื่อ');
+  await nav(page, 'จัดการผู้ใช้'); await page.getByLabel('กรองบทบาท').selectOption('user'); await expect(page.locator('tbody')).toContainText('ผู้ใช้งาน'); await expect(page.locator('tbody').getByText('นักศึกษา', { exact: true })).toHaveCount(0);
 });
